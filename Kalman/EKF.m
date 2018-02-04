@@ -98,16 +98,15 @@ Z_Noised=Z_GT+sigma_z*randn(m,N);
 X_est_apr=zeros(n,N);
 x_est_postr=zeros(n,1);
 
-%%% Covariance matrix
-P_est_post=eye(n);
-P_est_postr=eye(n);
 
-u=[a_x;a_y];
+P_est_postr=eye(n); % Covariance matrix
 
-F=[1 0 Ts 0; 0 1 0 Ts;0 0 1 0;0 0 0 1];
-G=[Ts^2/2 0;0 Ts^2/2;Ts 0;0 Ts];
+u=[a_x;a_y]; % input vector= acceleration
 
- % State functions
+F=[1 0 Ts 0; 0 1 0 Ts;0 0 1 0;0 0 0 1]; % state equation matrix
+G=[Ts^2/2 0;0 Ts^2/2;Ts 0;0 Ts]; % measurement eqauation matrix
+
+ %%% State functions
  
  p_anch_x=[p_anch_1_x;p_anch_2_x;p_anch_3_x];
  p_anch_y=[p_anch_1_y;p_anch_2_y;p_anch_3_y];
@@ -117,24 +116,24 @@ G=[Ts^2/2 0;0 Ts^2/2;Ts 0;0 Ts];
  p_anch_1=[p_anch_1_x;p_anch_1_y];
  p_anch_2=[p_anch_2_x;p_anch_2_y];
  p_anch_3=[p_anch_3_x;p_anch_3_y];
-
- f=@(x,u,w) F*x+G*u+w;
  
+ 
+%%% State equation
+ f=@(x,u,w) F*x+G*u+w; 
+ %%% Measurement equation
  h=@(p,p_anch,v) (p-p_anch)'*(p-p_anch)+v; % p and p_anch are 2x1 column vectors
 
 
-% Jacobians
- A=F;
- W=eye(n);
- 
+%%% Jacobians
 
+ A=F; % current state wrt to former state
+ W=eye(n); % current state wrt current state noise
  
- %H=2*[x_est_postr(1)*ones(m,1)-p_anch_x,x_est_postr(2)*ones(m,1)-p_anch_y,zeros(m,1),zeros(m,1)];
- H=2*[x_est_postr(1)*ones(m,1)-p_anch_x,...
+H=2*[x_est_postr(1)*ones(m,1)-p_anch_x,... % current measurement wrt current state
           x_est_postr(2)*ones(m,1)-p_anch_y,...
           zeros(m,1),zeros(m,1)];
 
- V=eye(m);
+ V=eye(m); % current measurment wrt current measurement noise
 
 for kk=2:N
 
@@ -145,7 +144,7 @@ for kk=2:N
     
     X_est_apr(:,kk)= x_est_apr;
     
-    P_est_apr=A*P_est_post*A'+W*Q*W';
+    P_est_apr=A*P_est_postr*A'+W*Q*W';
     
     %%% 2) Measurement correction equations
     
@@ -159,8 +158,6 @@ for kk=2:N
     h_vec=[h(x_est_apr(1:2),p_anch_1,0);h(x_est_apr(1:2),p_anch_2,0);h(x_est_apr(1:2),p_anch_3,0)];
     
     x_est_postr=x_est_apr+K*(z-h_vec);
-
-  %   x_est_postr=x_est_apr+K*(z-H*x_est_apr);
     
     P_est_postr=(eye(n)-K*H)*P_est_apr;
   
