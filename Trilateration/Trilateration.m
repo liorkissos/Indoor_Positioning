@@ -141,9 +141,9 @@ Diff_R_2D_norm=real(Diff_R1_2D.^2+Diff_R2_2D.^2+Diff_R3_2D.^2);
 figure
 set(gcf,'windowstyle','docked')
 plot(W_trace(:,1),W_trace(:,2));
-hold on
-graph1=plot(GT(:,1),GT(:,2));
-set(graph1,'LineWidth',2)
+% hold on
+% graph1=plot(GT(:,1),GT(:,2));
+% set(graph1,'LineWidth',2)
 
 legend('Estimated','Ground Truth','Location','best')
 
