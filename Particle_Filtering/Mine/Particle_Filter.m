@@ -88,9 +88,6 @@ for k=2:N
     X_particles(:,k)=xk;
     W_particles(:,k)=wk;
     
-    %     [x_particles(:,k),w_particles(:,k)]=Particle_Filter(PF);
-    
-    %   PF.q_params=[x_particles(:,k),x_particles(:,k-1),k+1,sigma_v];
     
 end
 
