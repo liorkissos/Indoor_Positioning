@@ -18,11 +18,23 @@ close all
 % the bigger the state eqaution noise, the more we rely on the measurements
 % and thus get closer to pure Trilateration.
 
+% % Measurement equation noise: standard deviation (v does not mean velocity)
+% sigma_v=1.5; % [m^2].
+% % State equation noise: standard deviation of the acceleration.  Guo&Qiu (page 5 left): maximum possible value
+% sigma_acc_x=0.1; % [m/sec^2].  acceleration
+% sigma_acc_y=0.1; % [m/sec^2].  acceleration
+
+% % Measurement equation noise: standard deviation (v does not mean velocity)
+% sigma_v=0.2; % [m^2].
+% % State equation noise: standard deviation of the acceleration.  Guo&Qiu (page 5 left): maximum possible value
+% sigma_acc_x=5.0; % [m/sec^2].  acceleration
+% sigma_acc_y=5.0; % [m/sec^2].  acceleration
+
 % Measurement equation noise: standard deviation (v does not mean velocity)
 sigma_v=1.5; % [m^2].
 % State equation noise: standard deviation of the acceleration.  Guo&Qiu (page 5 left): maximum possible value
-sigma_acc_x=0.1; % [m/sec^2].  acceleration
-sigma_acc_y=0.1; % [m/sec^2].  acceleration
+sigma_acc_x=20.0; % [m/sec^2].  acceleration
+sigma_acc_y=20.0; % [m/sec^2].  acceleration
 
 % problem dimensions
 n=4; % state vector dimension: position x axis, position y axis, velocity x axis, velocity y axis
@@ -219,7 +231,7 @@ figure
 set(gcf,'windowstyle','docked')
 %plot(X_est_apr(1,:),X_est_apr(2,:))
 plot(X_est_postr(1,:),X_est_postr(2,:))
-title('Tag Positioning estimation: EKF')
+title({['Tag Positioning estimation: EKF'],[' \sigma^v=',num2str(sigma_v),'[m^2]'],[' \sigma^{acc}=',num2str(sigma_acc_x),'[m/sec^2]  ']})
 grid minor
 xlabel('x[meter]')
 ylabel('y[meter]')
