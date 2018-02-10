@@ -1,3 +1,14 @@
+
+
+%%% Relevant material (all in Material Folder)
+%%% 0) "A Tutorial on Particle Filters for Online Nonlinear/Non-Gaussian
+%%% Bayesian Tracking"
+%%% 1) Indoor Pos EKF.docx
+%%% 2) DecaRange ARM source files
+%%% 3) DecaRangeRTLS_ARM_Source_Code_Guide.pdf
+%%% 4)  "Ultra-Wideband-Based Localization for Quadcopter Navigation"
+
+
 clc
 clear
 close all
@@ -8,7 +19,7 @@ debug=0
 
 Nth=50; % Resmapling threshold
 
-N_s=1000; % grid length
+N_s=500; % grid length
 
 
 sigma_v=1; % state vector noise
@@ -90,7 +101,8 @@ for k=2:N
     
     Neff=(sum(wk.^2))^(-1);
     
-    if Neff<Nth
+    %%% Resampling
+    if Neff<Nth 
         
         if debug
             [xk_sorted,I]=sort(xk);

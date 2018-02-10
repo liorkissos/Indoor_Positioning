@@ -18,11 +18,11 @@ close all
 % the bigger the state eqaution noise, the more we rely on the measurements
 % and thus get closer to pure Trilateration.
 
-% % Measurement equation noise: standard deviation (v does not mean velocity)
-% sigma_v=1.5; % [m^2].
-% % State equation noise: standard deviation of the acceleration.  Guo&Qiu (page 5 left): maximum possible value
-% sigma_acc_x=0.1; % [m/sec^2].  acceleration
-% sigma_acc_y=0.1; % [m/sec^2].  acceleration
+% Measurement equation noise: standard deviation (v does not mean velocity)
+sigma_v=1.5; % [m^2].
+% State equation noise: standard deviation of the acceleration.  Guo&Qiu (page 5 left): maximum possible value
+sigma_acc_x=0.1; % [m/sec^2].  acceleration
+sigma_acc_y=0.1; % [m/sec^2].  acceleration
 
 % % Measurement equation noise: standard deviation (v does not mean velocity)
 % sigma_v=0.2; % [m^2].
@@ -30,11 +30,11 @@ close all
 % sigma_acc_x=5.0; % [m/sec^2].  acceleration
 % sigma_acc_y=5.0; % [m/sec^2].  acceleration
 
-% Measurement equation noise: standard deviation (v does not mean velocity)
-sigma_v=1.5; % [m^2].
-% State equation noise: standard deviation of the acceleration.  Guo&Qiu (page 5 left): maximum possible value
-sigma_acc_x=20.0; % [m/sec^2].  acceleration
-sigma_acc_y=20.0; % [m/sec^2].  acceleration
+% % Measurement equation noise: standard deviation (v does not mean velocity)
+% sigma_v=1.5; % [m^2].
+% % State equation noise: standard deviation of the acceleration.  Guo&Qiu (page 5 left): maximum possible value
+% sigma_acc_x=20.0; % [m/sec^2].  acceleration
+% sigma_acc_y=20.0; % [m/sec^2].  acceleration
 
 % problem dimensions
 n=4; % state vector dimension: position x axis, position y axis, velocity x axis, velocity y axis
