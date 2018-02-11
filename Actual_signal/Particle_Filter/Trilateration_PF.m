@@ -14,10 +14,9 @@ debug_flag=0
 
 %% User defined parameters
 
-
-Nth=300; % Resmapling threshold
-
 N_s=500; % grid length
+
+Nth=30; % Resmapling threshold. should be regarded as an effective number of particles having a non zero probaility
 
 %%% 1) System model- Noises
 
@@ -25,10 +24,10 @@ N_s=500; % grid length
 % and thus get closer to pure Trilateration.
 
 % Measurement equation noise: standard deviation (v does not mean velocity)
-sigma_v=1.5; % [m^2].
+sigma_v=0.8; % [m^2].
 % State equation noise: standard deviation of the acceleration.  Guo&Qiu (page 5 left): maximum possible value
-sigma_acc_x=1.5; % [m/sec^2].  acceleration
-sigma_acc_y=1.5; % [m/sec^2].  acceleration
+sigma_acc_x=0.1; % [m/sec^2].  acceleration
+sigma_acc_y=0.1; % [m/sec^2].  acceleration
 
 % % Measurement equation noise: standard deviation (v does not mean velocity)
 % sigma_v=0.2; % [m^2].
@@ -110,33 +109,18 @@ N=size(Record,1);
 
 
 %%% TEMP
-R1_2D_m=R1_2D_m(1:20);
-R2_2D_m=R2_2D_m(1:20);
-R3_2D_m=R3_2D_m(1:20);
-
-N=length(R1_2D_m);
-
-
-
-%% Particel Filter formulation and Initialization
-
-%%% Initializations
-
-% % 0) Calculating the initial guess: Guo& Qiu article via linear LS problem (UWB based
-% % localization article.) equation (15)
+% n1=1;
+% n2=1380;
 % 
-% A_LS=2*[p_anch_1_x-p_anch_2_x , p_anch_1_y-p_anch_2_y ;...
-%     p_anch_1_x-p_anch_3_x , p_anch_1_y-p_anch_3_y];
+% R1_2D_m=R1_2D_m(n1:n2);
+% R2_2D_m=R2_2D_m(n1:n2);
+% R3_2D_m=R3_2D_m(n1:n2);
 % 
-% d1=R1_2D_m(1);
-% d2=R2_2D_m(1);
-% d3=R3_2D_m(1);
-% 
-% m1=d2^2-d1^2-(p_anch_2_x^2-p_anch_1_x^2+p_anch_2_y^2-p_anch_2_y^2);
-% m2=d3^2-d1^2-(p_anch_3_x^2-p_anch_1_x^2+p_anch_3_y^2-p_anch_1_y^2);
-% 
-% p_tag_init=A_LS\[m1;m2]; % LS solution
+% N=length(R1_2D_m);
 
+
+
+%% Particle Filter formulation and Initialization
 
 
 % 3)  Anchors position
@@ -164,7 +148,7 @@ mu_zk=@ (xk,p_anch_1,p_anch_2,p_anch_3)...
 
 p_zk_given_xk=@(zk,mu_zk,Cov_zk) mvnpdf(zk,mu_zk,Cov_zk);
 
-%%% General Gausssian random
+%%% 3) General Gausssian random
 
 Gen_xk=@(mu_xk,Cov_xk) mvnrnd (mu_xk,Cov_xk);
 
@@ -195,8 +179,6 @@ R=(sigma_v^2)*eye(m);
 
 %% Particle filtering
 
-X_particles=zeros(n,N_s,N);
-W_particles=zeros(n,N_s,N);
 
 % 0) Calculating the initial guess: Guo& Qiu article via linear LS problem (UWB based
 % localization article.) equation (15)
@@ -216,12 +198,20 @@ p_tag_init=A_LS\[m1;m2]; % LS solution
 % MAP estimator initialization
 x_est_MAP=[[p_tag_init;0;0],zeros(n,N-1)]; 
 
+% Initializations
+
 % Particles of positioning are initialized to be randomly distributed around the supposed
-% GT. velocity is supposed 0
-xk=[normrnd(p_tag_init(1),0.2,[1,N_s]);normrnd(p_tag_init(2),0.15,[1,N_s]);zeros(2,N_s)]; %  a row contains a single particle of the state vector, and we have N_s particles
+% GT. velocity is supposed 0 and normally distributed
+xk=[normrnd(p_tag_init(1),0.2,[1,N_s]);normrnd(p_tag_init(2),0.15,[1,N_s]);...
+        normrnd(0,0.1,[1,N_s]);normrnd(0,0.1,[1,N_s])]; %  a row contains a single particle of the state vector, and we have N_s particles
 
 wk=(1/N_s)*ones(1,N_s); % uniform distribution. it is p(xk | xk_1) so even if xk and xk_1 are vector the conditional probability is a scalar
 
+X_particles=zeros(n,N_s,N);
+W_particles=zeros(n,N_s,N);
+
+X_particles(:,:,1)=xk;
+W_particles(:,:,1)=repmat(wk,[n,1]);
 
 
 for k=2:N
@@ -249,10 +239,7 @@ for k=2:N
     end
     
     wk=wk/sum(wk);
-    
-    aaa=find(wk==max(wk));
-    x_est_MAP(:,k)=xk(:,aaa);
-    
+       
     Neff=(sum(wk.^2))^(-1);
     
     %%% Resampling
@@ -293,68 +280,41 @@ for k=2:N
     
 end
 
-%% Kalman Iteration
 
-% for kk=2:N
-%
-%     %%% 1) Time update equations
-%
-%     x_est_apr=f(x_est_postr,0); % apriori state vector estimator
-%
-%     P_est_apr=A*P_est_postr*A'+W*Q*W'; % apriori estimation error covariance matrix
-%
-%     %%% 2) Measurement correction equations
-%
-%     H=2*[x_est_postr(1)*ones(m,1)-p_anch_x,... % Jacobian of measurement wrt state calculation
-%         x_est_postr(2)*ones(m,1)-p_anch_y,...
-%         zeros(m,1),zeros(m,1)];
-%
-%     K=P_est_apr*H'/(H*P_est_apr*H'+V*R*V); % the K factor (K=P_est_apr*H'*inv(H*P_est_apr*H'+V*R*V);)
-%
-%     z=Z_Noised(:,kk);
-%     h_vec=[h(x_est_apr(1:2),p_anch_1,0);h(x_est_apr(1:2),p_anch_2,0);h(x_est_apr(1:2),p_anch_3,0)];
-%
-%     x_est_postr=x_est_apr+K*(z-h_vec); % posteriori state vector estimator
-%
-%     P_est_postr=(eye(n)-K*H)*P_est_apr; % posteriori estimation error estimator
-%
-%     %%% 3) Estimators saving
-%
-%     X_est_apr(:,kk)= x_est_apr;
-%     X_est_postr(:,kk)= x_est_postr;
-%
-% end
 
 %%  Analysis
 
 %%% MAP estimator
-% [M ,I]=max(W_particles);
-% Ind=sub2ind(size(W_particles),I,1:size(W_particles,2));
-% x_est_MAP=(X_particles(Ind))';
+w_particles=W_particles(1,:,:);
+[M ,I]=max(squeeze(w_particles),[],1);
+for k=1:N
+    x_est_MAP(:,k)=X_particles(:,I(k),k);
+end
 
 %%% MMSE estimator
-A=X_particles.*W_particles;
+A=X_particles.*W_particles; % value by probability; x*p(x|z)
 
-x_est_MMSE=squeeze(sum(A,2)); % summation along the row; along the particle index
+x_est_MMSE=squeeze(sum(A,2)); % summation along the row; along the particle index; E(x|z)=sum(x*p(x|z))
 
-
-
-%%% Errors
-%Err_MAP=sqrt((x_GT-x_est_MAP)'*(x_GT-x_est_MAP));
-
-%Err_MMSE=sqrt((x_GT-x_est_MMSE)'*(x_GT-x_est_MMSE));
 
 %% Display
 
+% figure
+% set(gcf,'windowstyle','docked')
+% plot(x_est_MMSE(1,:),x_est_MMSE(2,:))
+% hold on
+% plot(x_est_MAP(1,:),x_est_MAP(2,:))
+% grid minor
+% legend(['MMSE estimator'],['MAP estimator'])
+
 figure
 set(gcf,'windowstyle','docked')
-% plot(x_GT)
-% hold on
-%plot(x_est_MMSE(:,1),x_est_MMSE(:,2))
-% hold on
-plot(x_est_MAP(:,1),x_est_MAP(:,2))
+plot(x_est_MMSE(1,:),x_est_MMSE(2,:))
 grid minor
-%legend(['Ground Thruth'],['MAP estimator. Error=',num2str(Err_MAP),''],['MMSE estimator.Error=',num2str(Err_MMSE),''])
+title({['Tag Positioning MMSE estimation: Particle Filter '],[' # of particles=',num2str(N_s),'. Resampling Threshold=',num2str(Nth),''],...
+       ['Noises:  \sigma^v=',num2str(sigma_v),'[m^2]. \sigma^{acc}=',num2str(sigma_acc_x),'[m/sec^2]  ']})
+
+%title(['MMSE estimator: Particle Filter. # of particles=',num2str(N_s),'.'])
 
 shg
 
