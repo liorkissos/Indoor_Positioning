@@ -4,7 +4,9 @@
 %%% Relevant material:
 %%% 1) DecaRange ARM source files
 %%% 2) DecaRangeRTLS_ARM_Source_Code_Guide.pdf
-%%% 3) based on the article "Ultra-Wideband-Based Localization for Quadcopter Navigation" by Kexin Guo & Zhirong Qiu
+%%% 3) "Ultra-Wideband-Based Localization for Quadcopter Navigation" by Kexin Guo & Zhirong Qiu
+%%% 4) "A Tutorial on Particle Filters for Online Nonlinear/Non-Gaussian Bayesian Tracking"
+%%% 5) "Indoor Pos PF" Lior Kissos summary
 
 clc
 clear
@@ -14,32 +16,36 @@ debug_flag=0
 
 %% User defined parameters
 
-N_s=500; % grid length
+%%% Choosing between working with the ranges read from the UWB sensors or
+%%% their square
+%Observation='Range'
+Observation='Range Squared'
 
-Nth=30; % Resmapling threshold. should be regarded as an effective number of particles having a non zero probaility
+N_s=400; % grid length
+
+Nth=20; % Resmapling threshold. should be regarded as an effective number of particles having a non zero probaility
 
 %%% 1) System model- Noises
 
 % the bigger the state eqaution noise, the more we rely on the measurements
 % and thus get closer to pure Trilateration.
 
-% Measurement equation noise: standard deviation (v does not mean velocity)
-sigma_v=0.8; % [m^2].
-% State equation noise: standard deviation of the acceleration.  Guo&Qiu (page 5 left): maximum possible value
-sigma_acc_x=0.1; % [m/sec^2].  acceleration
-sigma_acc_y=0.1; % [m/sec^2].  acceleration
+switch Observation
+    case 'Range'
+        % Measurement equation noise: standard deviation (v does not mean velocity)
+        sigma_v=0.5; % [m^2].
+        % State equation noise: standard deviation of the acceleration.  Guo&Qiu (page 5 left): maximum possible value
+        sigma_acc_x=0.25; % [m/sec^2].  acceleration
+        sigma_acc_y=0.25; % [m/sec^2].  acceleration
+    case 'Range Squared'
+        % Measurement equation noise: standard deviation (v does not mean velocity)
+        sigma_v=0.8; % [m^2].
+        % State equation noise: standard deviation of the acceleration.  Guo&Qiu (page 5 left): maximum possible value
+        sigma_acc_x=0.1; % [m/sec^2].  acceleration
+        sigma_acc_y=0.1; % [m/sec^2].  acceleration
+        
+end
 
-% % Measurement equation noise: standard deviation (v does not mean velocity)
-% sigma_v=0.2; % [m^2].
-% % State equation noise: standard deviation of the acceleration.  Guo&Qiu (page 5 left): maximum possible value
-% sigma_acc_x=5.0; % [m/sec^2].  acceleration
-% sigma_acc_y=5.0; % [m/sec^2].  acceleration
-
-% % Measurement equation noise: standard deviation (v does not mean velocity)
-% sigma_v=1.5; % [m^2].
-% % State equation noise: standard deviation of the acceleration.  Guo&Qiu (page 5 left): maximum possible value
-% sigma_acc_x=20.0; % [m/sec^2].  acceleration
-% sigma_acc_y=20.0; % [m/sec^2].  acceleration
 
 % problem dimensions
 n=4; % state vector dimension: position x axis, position y axis, velocity x axis, velocity y axis
@@ -70,6 +76,11 @@ h_tag=1.43; % tag
 %%% 3) Decawave configuration
 Fs=1/280e-3; % the time interval between samples is 280msec. % parameter retrieved from ARM source code syscalls.c (portGetTickCount) and compiler.h (CLOCKS_PER_SEC)
 
+%% Sanity checks
+
+if strcmp(Observation,'Range') && N_s<500
+    warning('Number of particles in Range mode needs to be higher')
+end
 
 %%  Recoreded file parsing
 
@@ -95,7 +106,15 @@ R3_2D_m=R3_2D_mm/1e3;
 %% Intermediate calculations
 
 %%% Measurements vector
-Z_Noised=[R1_2D_m'.^2;R2_2D_m'.^2;R3_2D_m'.^2]; % measurement vector is the square horizontal distance from the 3 anchors which is regarded as the noisy measurement
+
+switch Observation
+    case 'Range'
+        Z_Noised=[R1_2D_m';R2_2D_m';R3_2D_m']; % measurement vector is the square horizontal distance from the 3 anchors which is regarded as the noisy measurement
+    case 'Range Squared'
+        Z_Noised=[R1_2D_m'.^2;R2_2D_m'.^2;R3_2D_m'.^2]; % measurement vector is the square horizontal distance from the 3 anchors which is regarded as the noisy measurement
+        
+end
+
 
 % Time
 t_ticks=hex2dec(table2cell(Record(:,9))); % the DEBUG row see (DecaRangeRTLS_ARM_source.pdf)
@@ -106,17 +125,6 @@ t=t_ticks*Ts; % the time axis in seconds
 
 % length of recording
 N=size(Record,1);
-
-
-%%% TEMP
-% n1=1;
-% n2=1380;
-% 
-% R1_2D_m=R1_2D_m(n1:n2);
-% R2_2D_m=R2_2D_m(n1:n2);
-% R3_2D_m=R3_2D_m(n1:n2);
-% 
-% N=length(R1_2D_m);
 
 
 
@@ -142,9 +150,14 @@ p_xk_given_xk_1=@(xk,F,xk_1,Q) mvnpdf(xk,mu_xk(F,xk_1),Q); % need the pdf of a r
 
 %%% 2) Measurement equation
 %h=@(p,p_anch,v) (p-p_anch)'*(p-p_anch)+v; % p and p_anch are 2x1 column vectors
-
-mu_zk=@ (xk,p_anch_1,p_anch_2,p_anch_3)...
-    [ (xk-p_anch_1)'*(xk-p_anch_1);  (xk-p_anch_2)'*(xk-p_anch_2)    ;   (xk-p_anch_3)'*(xk-p_anch_3)     ];
+switch Observation
+    case 'Range'
+        mu_zk=@ (xk,p_anch_1,p_anch_2,p_anch_3)...
+            [sqrt( (xk-p_anch_1)'*(xk-p_anch_1)); sqrt( (xk-p_anch_2)'*(xk-p_anch_2))    ;   sqrt((xk-p_anch_3)'*(xk-p_anch_3) ) ];
+    case 'Range Squared'
+        mu_zk=@ (xk,p_anch_1,p_anch_2,p_anch_3)...
+            [ (xk-p_anch_1)'*(xk-p_anch_1);  (xk-p_anch_2)'*(xk-p_anch_2)    ;   (xk-p_anch_3)'*(xk-p_anch_3)     ];
+end
 
 p_zk_given_xk=@(zk,mu_zk,Cov_zk) mvnpdf(zk,mu_zk,Cov_zk);
 
@@ -173,7 +186,7 @@ Q=[sigma_acc_x^2*Ts^4/4, 0 , sigma_acc_x^2*Ts^3/2, 0;...
 %     sigma_acc_x^2*Ts^3/2    , 0 , sigma_acc_x^2*Ts^2, 0;...
 %     0, sigma_acc_y^2*Ts^3/2, 0, sigma_acc_y^2*Ts^2         ]; % equation (7)
 
-% 2) Measurement equation noise covariance ,atrix
+% 2) Measurement equation noise covariance matrix
 
 R=(sigma_v^2)*eye(m);
 
@@ -196,14 +209,14 @@ m2=d3^2-d1^2-(p_anch_3_x^2-p_anch_1_x^2+p_anch_3_y^2-p_anch_1_y^2);
 p_tag_init=A_LS\[m1;m2]; % LS solution
 
 % MAP estimator initialization
-x_est_MAP=[[p_tag_init;0;0],zeros(n,N-1)]; 
+x_est_MAP=[[p_tag_init;0;0],zeros(n,N-1)];
 
 % Initializations
 
 % Particles of positioning are initialized to be randomly distributed around the supposed
 % GT. velocity is supposed 0 and normally distributed
 xk=[normrnd(p_tag_init(1),0.2,[1,N_s]);normrnd(p_tag_init(2),0.15,[1,N_s]);...
-        normrnd(0,0.1,[1,N_s]);normrnd(0,0.1,[1,N_s])]; %  a row contains a single particle of the state vector, and we have N_s particles
+    normrnd(0,0.1,[1,N_s]);normrnd(0,0.1,[1,N_s])]; %  a row contains a single particle of the state vector, and we have N_s particles
 
 wk=(1/N_s)*ones(1,N_s); % uniform distribution. it is p(xk | xk_1) so even if xk and xk_1 are vector the conditional probability is a scalar
 
@@ -215,34 +228,29 @@ W_particles(:,:,1)=repmat(wk,[n,1]);
 
 
 for k=2:N
-   
+    
     xk_1=xk;
     wk_1=wk;
     zk=Z_Noised(:,k);
-
+    
     for i=1:N_s
         
+        %%% 1) Particles grid drawing out of p(xk|xk_1)
         mu_xk_vec= mu_xk(F,xk_1(:,i)); % mu_xk=@(F,xk_1) F*xk_1;
         xk(:,i)=Gen_xk(mu_xk_vec,Q); %Gen_xk=@(mu_xk,Cov_xk) mvnrnd (mu_xk,Cov_xk);
         
+         %%% 2) Weights calculation
         mu_zk_vec=mu_zk(xk(1:2,i),p_anch_1,p_anch_2,p_anch_3); %mu_zk=@ (xk,p_anch_1,p_anch_2,p_anch_3)
         wk(i)=wk_1(i)*p_zk_given_xk(zk,mu_zk_vec,R); %=@(zk,mu_zk,R) mvnpdf(zk,mu_zk,R);(zk,xk(1:2,i),p_anch_1,p_anch_2,p_anch_3,R);
         
     end
-   
-    if debug_flag && 0
-        close all
-        figure
-        set(gcf,'windowstyle','docked')
-        plot(wk)
-        shg
-    end
-    
+
+    %%% 3) Weights Normalization
     wk=wk/sum(wk);
-       
+
+    %%% 4) Resampling
     Neff=(sum(wk.^2))^(-1);
     
-    %%% Resampling
     if Neff<Nth
         
         if debug_flag
@@ -251,7 +259,7 @@ for k=2:N
         end
         
         [xk]=resample_mat(xk,wk);
-        wk=(1/N_s)*ones(1,N_s);
+        wk=(1/N_s)*ones(1,N_s); %assign uniform distribution to the resampled particles 
         
         if debug_flag
             close all
@@ -270,8 +278,7 @@ for k=2:N
             xlabel('xk resmpled')
             shg
         end
-        
-        
+  
     end
     
     X_particles(:,:,k)=xk;
@@ -312,9 +319,8 @@ set(gcf,'windowstyle','docked')
 plot(x_est_MMSE(1,:),x_est_MMSE(2,:))
 grid minor
 title({['Tag Positioning MMSE estimation: Particle Filter '],[' # of particles=',num2str(N_s),'. Resampling Threshold=',num2str(Nth),''],...
-       ['Noises:  \sigma^v=',num2str(sigma_v),'[m^2]. \sigma^{acc}=',num2str(sigma_acc_x),'[m/sec^2]  ']})
+    ['Noises:  \sigma^v=',num2str(sigma_v),'[m^2]. \sigma^{acc}=',num2str(sigma_acc_x),'[m/sec^2]  ']})
 
-%title(['MMSE estimator: Particle Filter. # of particles=',num2str(N_s),'.'])
 
 shg
 
